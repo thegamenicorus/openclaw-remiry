@@ -28,7 +28,7 @@ type Handler = (req: {
 const routes: Array<{ method: string; pattern: string; handler: Handler }> = [];
 
 const api = {
-  registerHttpRoute(opts: { method: string; path: string; handler: Handler }) {
+  registerHttpRoute(opts: { method: string; path: string; auth: string; handler: Handler }) {
     routes.push({ method: opts.method.toUpperCase(), pattern: opts.path, handler: opts.handler });
     console.log(`  registered  ${opts.method.toUpperCase().padEnd(6)} ${opts.path}`);
   },

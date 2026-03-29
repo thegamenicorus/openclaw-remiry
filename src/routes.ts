@@ -4,6 +4,7 @@ type PluginApi = {
   registerHttpRoute(opts: {
     method: string;
     path: string;
+    auth: "gateway" | "plugin";
     handler: (req: HttpRequest) => HttpResponse | Promise<HttpResponse>;
   }): void;
 };
@@ -62,7 +63,7 @@ function serializeItem(item: ReturnType<RemiryDb["getById"]>) {
 
 export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   // GET /remiry/items?type=remind|expire
-  api.registerHttpRoute({ method: "GET", path: "/remiry/items", handler: (req) => {
+  api.registerHttpRoute({ method: "GET", path: "/remiry/items", auth: "gateway", handler: (req) => {
     try {
       const type = req.query?.type as ItemType | undefined;
       if (type && type !== "remind" && type !== "expire") {
@@ -76,7 +77,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // GET /remiry/items/:id
-  api.registerHttpRoute({ method: "GET", path: "/remiry/items/:id", handler: (req) => {
+  api.registerHttpRoute({ method: "GET", path: "/remiry/items/:id", auth: "gateway", handler: (req) => {
     try {
       const id = Number(req.params?.id);
       if (!Number.isInteger(id) || id <= 0) return badRequest("Invalid id");
@@ -89,7 +90,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // POST /remiry/items
-  api.registerHttpRoute({ method: "POST", path: "/remiry/items", handler: (req) => {
+  api.registerHttpRoute({ method: "POST", path: "/remiry/items", auth: "gateway", handler: (req) => {
     try {
       const body = req.body as Record<string, unknown> | undefined;
       if (!body) return badRequest("Request body is required");
@@ -128,7 +129,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // PUT /remiry/items/:id
-  api.registerHttpRoute({ method: "PUT", path: "/remiry/items/:id", handler: (req) => {
+  api.registerHttpRoute({ method: "PUT", path: "/remiry/items/:id", auth: "gateway", handler: (req) => {
     try {
       const id = Number(req.params?.id);
       if (!Number.isInteger(id) || id <= 0) return badRequest("Invalid id");
@@ -172,7 +173,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // DELETE /remiry/items  (clear all — requires ?confirm=true)
-  api.registerHttpRoute({ method: "DELETE", path: "/remiry/items", handler: (req) => {
+  api.registerHttpRoute({ method: "DELETE", path: "/remiry/items", auth: "gateway", handler: (req) => {
     try {
       if (req.query?.confirm !== "true") {
         return badRequest("Pass ?confirm=true to clear all items");
@@ -185,7 +186,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // DELETE /remiry/items/:id
-  api.registerHttpRoute({ method: "DELETE", path: "/remiry/items/:id", handler: (req) => {
+  api.registerHttpRoute({ method: "DELETE", path: "/remiry/items/:id", auth: "gateway", handler: (req) => {
     try {
       const id = Number(req.params?.id);
       if (!Number.isInteger(id) || id <= 0) return badRequest("Invalid id");
@@ -198,7 +199,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // GET /remiry/upcoming/events?days=7
-  api.registerHttpRoute({ method: "GET", path: "/remiry/upcoming/events", handler: (req) => {
+  api.registerHttpRoute({ method: "GET", path: "/remiry/upcoming/events", auth: "gateway", handler: (req) => {
     try {
       const days = Number(req.query?.days ?? "7");
       if (!Number.isInteger(days) || days < 0) return badRequest("days must be a non-negative integer");
@@ -210,7 +211,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // GET /remiry/summary?date=YYYY-MM-DD&upcoming_days=7
-  api.registerHttpRoute({ method: "GET", path: "/remiry/summary", handler: (req) => {
+  api.registerHttpRoute({ method: "GET", path: "/remiry/summary", auth: "gateway", handler: (req) => {
     try {
       const date = req.query?.date ?? new Date().toISOString().slice(0, 10);
       if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
@@ -240,7 +241,7 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
   }});
 
   // GET /remiry/upcoming/expiry?days=7
-  api.registerHttpRoute({ method: "GET", path: "/remiry/upcoming/expiry", handler: (req) => {
+  api.registerHttpRoute({ method: "GET", path: "/remiry/upcoming/expiry", auth: "gateway", handler: (req) => {
     try {
       const days = Number(req.query?.days ?? "7");
       if (!Number.isInteger(days) || days < 0) return badRequest("days must be a non-negative integer");
