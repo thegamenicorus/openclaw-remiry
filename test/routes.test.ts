@@ -5,22 +5,22 @@ import { registerRoutes } from "../src/routes.js";
 import type { RemiryDb } from "../src/db.js";
 
 // Minimal in-process route runner — captures registered routes and calls them directly
-type Handler = (req: { params?: Record<string, string>; query?: Record<string, string>; body?: unknown }) => unknown;
+type Handler = (req: { method?: string; params?: Record<string, string>; query?: Record<string, string>; body?: unknown }) => unknown;
 
 function buildRouter(db: RemiryDb) {
   const routes: Map<string, Handler> = new Map();
   const api = {
-    registerHttpRoute(opts: { method: string; path: string; auth: string; handler: Handler }) {
-      routes.set(`${opts.method} ${opts.path}`, opts.handler);
+    registerHttpRoute(opts: { path: string; auth: string; handler: Handler }) {
+      routes.set(opts.path, opts.handler);
     },
   };
   registerRoutes(api, db);
 
   return {
     call(method: string, path: string, opts: { params?: Record<string, string>; query?: Record<string, string>; body?: unknown } = {}) {
-      const handler = routes.get(`${method} ${path}`);
-      if (!handler) throw new Error(`No route: ${method} ${path}`);
-      return handler(opts) as { status: number; body: { success: boolean; data?: unknown; error?: string } };
+      const handler = routes.get(path);
+      if (!handler) throw new Error(`No route: ${path}`);
+      return handler({ method, ...opts }) as { status: number; body: { success: boolean; data?: unknown; error?: string } };
     },
   };
 }

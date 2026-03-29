@@ -25,12 +25,12 @@ type Handler = (req: {
   body?: unknown;
 }) => unknown;
 
-const routes: Array<{ method: string; pattern: string; handler: Handler }> = [];
+const routes: Array<{ pattern: string; handler: Handler }> = [];
 
 const api = {
-  registerHttpRoute(opts: { method: string; path: string; auth: string; handler: Handler }) {
-    routes.push({ method: opts.method.toUpperCase(), pattern: opts.path, handler: opts.handler });
-    console.log(`  registered  ${opts.method.toUpperCase().padEnd(6)} ${opts.path}`);
+  registerHttpRoute(opts: { path: string; auth: string; handler: Handler }) {
+    routes.push({ pattern: opts.path, handler: opts.handler });
+    console.log(`  registered  ${opts.path}`);
   },
 };
 
@@ -41,9 +41,8 @@ registerRoutes(api, db);
 
 // ── Route matcher ─────────────────────────────────────────────────────────────
 
-function matchRoute(method: string, pathname: string) {
+function matchRoute(pathname: string) {
   for (const route of routes) {
-    if (route.method !== method) continue;
     const paramNames: string[] = [];
     const regexStr = route.pattern.replace(/:([^/]+)/g, (_, name) => {
       paramNames.push(name);
@@ -92,7 +91,7 @@ const server = http.createServer(async (req, res) => {
     }
   }
 
-  const matched = matchRoute(method, pathname);
+  const matched = matchRoute(pathname);
 
   if (!matched) {
     res.writeHead(404, { "Content-Type": "application/json" });
@@ -107,6 +106,7 @@ const server = http.createServer(async (req, res) => {
 
   try {
     const result = (await matched.handler({
+      method,
       params: matched.params,
       query,
       body,
