@@ -1,4 +1,5 @@
-import Database from "better-sqlite3";
+import pkg from "node-sqlite3-wasm";
+const { Database } = pkg as unknown as { Database: new (path: string) => import("node-sqlite3-wasm").Database };
 import { homedir } from "node:os";
 import { join } from "node:path";
 
@@ -38,7 +39,6 @@ export interface UpdateItemInput {
 }
 
 export interface RemiryDb {
-  db: Database.Database;
   getAll(type?: ItemType): Item[];
   getById(id: number): Item | undefined;
   create(input: CreateItemInput): Item;
@@ -63,40 +63,53 @@ const CREATE_TABLE_SQL = `
   );
 `;
 
+// node-sqlite3-wasm returns null (not undefined) for missing rows,
+// and returns BLOBs as Uint8Array instead of Buffer.
+function normalize(row: unknown): Item | undefined {
+  if (row == null) return undefined;
+  const item = row as Item;
+  if (item.image != null) {
+    item.image = Buffer.from(item.image as unknown as Uint8Array);
+  }
+  return item;
+}
+
+function toUint8Array(buf: Buffer | null | undefined): Uint8Array | null {
+  if (buf == null) return null;
+  return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
+}
+
 export function initDb(dbPath?: string): RemiryDb {
   const resolvedPath = dbPath ?? join(homedir(), ".openclaw", "remiry.db");
   const db = new Database(resolvedPath);
   db.exec(CREATE_TABLE_SQL);
 
   return {
-    db,
-
     getAll(type?: ItemType): Item[] {
-      if (type) {
-        return db.prepare("SELECT * FROM items WHERE type = ? ORDER BY target_date ASC").all(type) as Item[];
-      }
-      return db.prepare("SELECT * FROM items ORDER BY target_date ASC").all() as Item[];
+      const rows = type
+        ? db.prepare("SELECT * FROM items WHERE type = ? ORDER BY target_date ASC").all(type)
+        : db.prepare("SELECT * FROM items ORDER BY target_date ASC").all();
+      return rows.map(normalize).filter((r): r is Item => r !== undefined);
     },
 
     getById(id: number): Item | undefined {
-      return db.prepare("SELECT * FROM items WHERE id = ?").get(id) as Item | undefined;
+      return normalize(db.prepare("SELECT * FROM items WHERE id = ?").get(id));
     },
 
     create(input: CreateItemInput): Item {
       const today = new Date().toISOString().slice(0, 10);
-      const stmt = db.prepare(`
+      const result = db.prepare(`
         INSERT INTO items (type, name, desc, image, bbf, active_date, target_date)
-        VALUES (@type, @name, @desc, @image, @bbf, @active_date, @target_date)
-      `);
-      const result = stmt.run({
-        type: input.type,
-        name: input.name,
-        desc: input.desc ?? null,
-        image: input.image ?? null,
-        bbf: input.bbf ? 1 : 0,
-        active_date: input.active_date ?? today,
-        target_date: input.target_date,
-      });
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `).run([
+        input.type,
+        input.name,
+        input.desc ?? null,
+        toUint8Array(input.image ?? null),
+        input.bbf ? 1 : 0,
+        input.active_date ?? today,
+        input.target_date,
+      ]);
       return this.getById(result.lastInsertRowid as number)!;
     },
 
@@ -105,43 +118,46 @@ export function initDb(dbPath?: string): RemiryDb {
       if (!existing) return undefined;
 
       const fields: string[] = ["updated_at = datetime('now')"];
-      const values: Record<string, unknown> = { id };
+      const values: unknown[] = [];
 
-      if (input.type !== undefined) { fields.push("type = @type"); values.type = input.type; }
-      if (input.name !== undefined) { fields.push("name = @name"); values.name = input.name; }
-      if ("desc" in input) { fields.push("desc = @desc"); values.desc = input.desc ?? null; }
-      if ("image" in input) { fields.push("image = @image"); values.image = input.image ?? null; }
-      if (input.bbf !== undefined) { fields.push("bbf = @bbf"); values.bbf = input.bbf ? 1 : 0; }
-      if (input.active_date !== undefined) { fields.push("active_date = @active_date"); values.active_date = input.active_date; }
-      if (input.target_date !== undefined) { fields.push("target_date = @target_date"); values.target_date = input.target_date; }
+      if (input.type !== undefined) { fields.push("type = ?"); values.push(input.type); }
+      if (input.name !== undefined) { fields.push("name = ?"); values.push(input.name); }
+      if ("desc" in input) { fields.push("desc = ?"); values.push(input.desc ?? null); }
+      if ("image" in input) { fields.push("image = ?"); values.push(toUint8Array(input.image ?? null)); }
+      if (input.bbf !== undefined) { fields.push("bbf = ?"); values.push(input.bbf ? 1 : 0); }
+      if (input.active_date !== undefined) { fields.push("active_date = ?"); values.push(input.active_date); }
+      if (input.target_date !== undefined) { fields.push("target_date = ?"); values.push(input.target_date); }
 
-      db.prepare(`UPDATE items SET ${fields.join(", ")} WHERE id = @id`).run(values);
+      values.push(id);
+      db.prepare(`UPDATE items SET ${fields.join(", ")} WHERE id = ?`).run(values);
       return this.getById(id);
     },
 
     remove(id: number): boolean {
-      const result = db.prepare("DELETE FROM items WHERE id = ?").run(id);
+      const result = db.prepare("DELETE FROM items WHERE id = ?").run([id]);
       return result.changes > 0;
     },
 
     upcomingEvents(days: number): Item[] {
-      return db.prepare(`
+      const rows = db.prepare(`
         SELECT * FROM items
         WHERE type = 'remind'
           AND target_date >= date('now')
           AND target_date <= date('now', '+' || ? || ' days')
         ORDER BY target_date ASC
-      `).all(days) as Item[];
+      `).all(days);
+      return rows.map(normalize).filter((r): r is Item => r !== undefined);
     },
 
     upcomingExpiry(days: number): Item[] {
-      return db.prepare(`
+      const rows = db.prepare(`
         SELECT * FROM items
         WHERE type = 'expire'
           AND target_date >= date('now')
           AND target_date <= date('now', '+' || ? || ' days')
         ORDER BY target_date ASC
-      `).all(days) as Item[];
+      `).all(days);
+      return rows.map(normalize).filter((r): r is Item => r !== undefined);
     },
   };
 }

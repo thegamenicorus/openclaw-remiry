@@ -9,15 +9,16 @@
     "skills": ["./skills"]
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx/esm --test test/**/*.test.ts"
   },
   "dependencies": {
-    "better-sqlite3": "^11.0.0",
+    "node-sqlite3-wasm": "^0.8.0",
     "@sinclair/typebox": "^0.33.0"
   },
   "devDependencies": {
     "typescript": "^5.5.0",
-    "@types/better-sqlite3": "^7.6.11",
+    "tsx": "^4.19.0",
     "@types/node": "^22.0.0"
   }
 }
