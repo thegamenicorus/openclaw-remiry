@@ -40,10 +40,10 @@ No `npm install` needed in production — zero runtime dependencies.
 
 ## Data Storage
 
-All plugin data is stored under `~/.openclaw/workspace/remiry/`:
+All plugin data is stored under `~/.openclaw/extensions/remiry/`:
 
 ```
-~/.openclaw/workspace/remiry/
+~/.openclaw/extensions/remiry/
 ├── remiry.db       ← SQLite database
 └── images/         ← image files
     ├── 1.jpg
@@ -70,8 +70,8 @@ Optional. Add to `~/.openclaw/openclaw.json` only if you want custom paths:
 
 | Key | Default | Description |
 |-----|---------|-------------|
-| `dbPath` | `~/.openclaw/workspace/remiry/remiry.db` | SQLite database file |
-| `imagesDir` | `~/.openclaw/workspace/remiry/images` | Directory for stored images |
+| `dbPath` | `~/.openclaw/extensions/remiry/remiry.db` | SQLite database file |
+| `imagesDir` | `~/.openclaw/extensions/remiry/images` | Directory for stored images |
 
 ---
 

@@ -100,11 +100,11 @@ const CREATE_TABLE_SQL = `
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 export function initDb(dbPath?: string, imagesDir?: string): RemiryDb {
-  const resolvedPath = dbPath ?? join(homedir(), ".openclaw", "workspace", "remiry", "remiry.db");
+  const resolvedPath = dbPath ?? join(homedir(), ".openclaw", "extensions", "remiry", "remiry.db");
   const inMemory = resolvedPath === ":memory:";
   const imgDir = imagesDir ?? (inMemory
     ? join(tmpdir(), "remiry-test-images")
-    : join(homedir(), ".openclaw", "workspace", "remiry", "images"));
+    : join(homedir(), ".openclaw", "extensions", "remiry", "images"));
 
   if (!inMemory) {
     const dir = dirname(resolvedPath);

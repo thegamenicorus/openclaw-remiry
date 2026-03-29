@@ -8,11 +8,11 @@
     "properties": {
       "dbPath": {
         "type": "string",
-        "description": "Custom path for the SQLite database file (default: ~/.openclaw/workspace/remiry/remiry.db)"
+        "description": "Custom path for the SQLite database file (default: ~/.openclaw/extensions/remiry/remiry.db)"
       },
       "imagesDir": {
         "type": "string",
-        "description": "Custom directory for stored images (default: ~/.openclaw/workspace/remiry/images)"
+        "description": "Custom directory for stored images (default: ~/.openclaw/extensions/remiry/images)"
       }
     }
   }
