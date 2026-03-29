@@ -9,8 +9,11 @@ export default definePluginEntry({
   description: "Track reminders for upcoming events and expiry/best-before dates for items",
 
   register(api, config) {
-    const dbPath = (config as Record<string, unknown>)?.dbPath as string | undefined;
-    const db = initDb(dbPath);
+    const cfg = config as Record<string, unknown> | undefined;
+    const db = initDb(
+      cfg?.dbPath    as string | undefined,
+      cfg?.imagesDir as string | undefined,
+    );
 
     registerRoutes(api as Parameters<typeof registerRoutes>[0], db);
     registerTools(api as Parameters<typeof registerTools>[0], db);

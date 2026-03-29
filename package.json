@@ -10,10 +10,10 @@
   },
   "scripts": {
     "typecheck": "tsc --noEmit",
-    "test": "node --import tsx/esm --test test/**/*.test.ts"
+    "test": "node --import tsx/esm --test test/**/*.test.ts",
+    "dev": "lsof -ti:3000 | xargs kill -9 2>/dev/null; node --import tsx/esm dev-server.ts"
   },
   "dependencies": {
-    "node-sqlite3-wasm": "^0.8.0",
     "@sinclair/typebox": "^0.33.0"
   },
   "devDependencies": {

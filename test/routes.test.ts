@@ -94,7 +94,7 @@ describe("POST /remiry/items", () => {
     const db = initDb(":memory:");
     const router = buildRouter(db);
     const res = router.call("POST", "/remiry/items", {
-      body: { type: "remind", name: "Meeting", target_date: "2026-04-10" },
+      body: { type: "remind", name: "Meeting", target_date: "2026-04-10 09:00" },
     });
     assert.equal(res.status, 201);
     assert.equal((res.body.data as { name: string }).name, "Meeting");
@@ -128,6 +128,24 @@ describe("POST /remiry/items", () => {
     assert.equal(res.status, 400);
   });
 
+  test("rejects date-only target_date for remind type", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("POST", "/remiry/items", {
+      body: { type: "remind", name: "Test", target_date: "2026-04-10" },
+    });
+    assert.equal(res.status, 400);
+  });
+
+  test("accepts datetime target_date for remind type", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("POST", "/remiry/items", {
+      body: { type: "remind", name: "Test", target_date: "2026-04-10 14:30" },
+    });
+    assert.equal(res.status, 201);
+  });
+
   test("rejects invalid type", () => {
     const db = initDb(":memory:");
     const router = buildRouter(db);
@@ -137,7 +155,7 @@ describe("POST /remiry/items", () => {
     assert.equal(res.status, 400);
   });
 
-  test("accepts base64 image", () => {
+  test("accepts base64 image and returns file path", () => {
     const db = initDb(":memory:");
     const router = buildRouter(db);
     const imageB64 = Buffer.from("fake-image").toString("base64");
@@ -145,8 +163,8 @@ describe("POST /remiry/items", () => {
       body: { type: "expire", name: "Cheese", target_date: "2026-04-20", image: imageB64 },
     });
     assert.equal(res.status, 201);
-    // image should come back as base64
-    assert.equal((res.body.data as { image: string }).image, imageB64);
+    // image comes back as a file path string
+    assert.ok(typeof (res.body.data as { image: string }).image === "string");
   });
 });
 
@@ -231,5 +249,66 @@ describe("GET /remiry/upcoming/expiry", () => {
     const res = router.call("GET", "/remiry/upcoming/expiry");
     assert.equal(res.status, 200);
     assert.equal((res.body.data as unknown[]).length, 1);
+  });
+});
+
+describe("DELETE /remiry/items (clear all)", () => {
+  test("clears all items with confirm=true", () => {
+    const db = initDb(":memory:");
+    db.create({ type: "remind", name: "A", target_date: "2026-04-01 09:00" });
+    db.create({ type: "expire", name: "B", target_date: "2026-04-02" });
+    const router = buildRouter(db);
+    const res = router.call("DELETE", "/remiry/items", { query: { confirm: "true" } });
+    assert.equal(res.status, 200);
+    assert.equal((res.body.data as { deleted: number }).deleted, 2);
+    assert.equal(db.getAll().length, 0);
+  });
+
+  test("rejects without confirm=true", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("DELETE", "/remiry/items", {});
+    assert.equal(res.status, 400);
+  });
+});
+
+describe("GET /remiry/summary", () => {
+  test("returns on_date and upcoming sections", () => {
+    const db = initDb(":memory:");
+    db.create({ type: "remind", name: "Morning",  target_date: "2026-04-15 09:00" });
+    db.create({ type: "expire", name: "Milk",     target_date: "2026-04-15" });
+    db.create({ type: "remind", name: "Next day", target_date: "2026-04-16 10:00" });
+    db.create({ type: "expire", name: "Cheese",   target_date: "2026-04-18" });
+    const router = buildRouter(db);
+    const res = router.call("GET", "/remiry/summary", { query: { date: "2026-04-15", upcoming_days: "7" } });
+    assert.equal(res.status, 200);
+    const data = res.body.data as { on_date: { events: unknown[]; expiry: unknown[] }; upcoming: { events: unknown[]; expiry: unknown[] } };
+    assert.equal(data.on_date.events.length, 1);
+    assert.equal(data.on_date.expiry.length, 1);
+    assert.equal(data.upcoming.events.length, 1);
+    assert.equal(data.upcoming.expiry.length, 1);
+  });
+
+  test("defaults to today when date omitted", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("GET", "/remiry/summary");
+    assert.equal(res.status, 200);
+    const data = res.body.data as { date: string };
+    assert.equal(data.date, new Date().toISOString().slice(0, 10));
+  });
+
+  test("rejects invalid date format", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("GET", "/remiry/summary", { query: { date: "not-a-date" } });
+    assert.equal(res.status, 400);
+  });
+
+  test("rejects negative upcoming_days", () => {
+    const db = initDb(":memory:");
+    const router = buildRouter(db);
+    const res = router.call("GET", "/remiry/summary", { query: { date: "2026-04-15", upcoming_days: "-1" } });
+    assert.equal(res.status, 400);
   });
 });

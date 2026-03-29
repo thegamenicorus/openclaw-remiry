@@ -39,6 +39,13 @@ function serverError(err: unknown): HttpResponse {
   return { status: 500, body: { success: false, error: String(err) } };
 }
 
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const DATETIME  = /^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/;
+
+function isValidTargetDate(type: "remind" | "expire", value: string): boolean {
+  return type === "remind" ? DATETIME.test(value) : DATE_ONLY.test(value);
+}
+
 function parseImage(imageB64: string | undefined): Buffer | undefined {
   if (!imageB64) return undefined;
   return Buffer.from(imageB64, "base64");
@@ -49,7 +56,7 @@ function serializeItem(item: ReturnType<RemiryDb["getById"]>) {
   return {
     ...item,
     bbf: item.bbf === 1,
-    image: item.image ? item.image.toString("base64") : null,
+    // image is already a file path string (or null) — return as-is
   };
 }
 
@@ -95,8 +102,12 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
       if (typeof name !== "string" || !name.trim()) {
         return badRequest("name is required");
       }
-      if (typeof target_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(target_date)) {
-        return badRequest("target_date is required in YYYY-MM-DD format");
+      if (typeof target_date !== "string" || !isValidTargetDate(type, target_date)) {
+        return badRequest(
+          type === "remind"
+            ? "target_date is required in YYYY-MM-DD HH:MM format for events"
+            : "target_date is required in YYYY-MM-DD format for expiry items"
+        );
       }
 
       const input: CreateItemInput = {
@@ -130,8 +141,17 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
       if (type !== undefined && type !== "remind" && type !== "expire") {
         return badRequest("type must be 'remind' or 'expire'");
       }
-      if (target_date !== undefined && (typeof target_date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(target_date))) {
-        return badRequest("target_date must be in YYYY-MM-DD format");
+      if (target_date !== undefined) {
+        const existing = db.getById(id);
+        if (!existing) return notFound(`Item ${id} not found`);
+        const effectiveType = (type as ItemType | undefined) ?? existing.type;
+        if (typeof target_date !== "string" || !isValidTargetDate(effectiveType, target_date)) {
+          return badRequest(
+            effectiveType === "remind"
+              ? "target_date must be in YYYY-MM-DD HH:MM format for events"
+              : "target_date must be in YYYY-MM-DD format for expiry items"
+          );
+        }
       }
 
       const input: UpdateItemInput = {};
@@ -146,6 +166,19 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
       const updated = db.update(id, input);
       if (!updated) return notFound(`Item ${id} not found`);
       return ok(serializeItem(updated));
+    } catch (err) {
+      return serverError(err);
+    }
+  });
+
+  // DELETE /remiry/items  (clear all — requires ?confirm=true)
+  api.registerHttpRoute("DELETE", "/remiry/items", (req) => {
+    try {
+      if (req.query?.confirm !== "true") {
+        return badRequest("Pass ?confirm=true to clear all items");
+      }
+      const result = db.clearAll();
+      return ok({ ...result, message: "All items cleared" });
     } catch (err) {
       return serverError(err);
     }
@@ -171,6 +204,36 @@ export function registerRoutes(api: PluginApi, db: RemiryDb): void {
       if (!Number.isInteger(days) || days < 0) return badRequest("days must be a non-negative integer");
       const items = db.upcomingEvents(days).map(serializeItem);
       return ok(items);
+    } catch (err) {
+      return serverError(err);
+    }
+  });
+
+  // GET /remiry/summary?date=YYYY-MM-DD&upcoming_days=7
+  api.registerHttpRoute("GET", "/remiry/summary", (req) => {
+    try {
+      const date = req.query?.date ?? new Date().toISOString().slice(0, 10);
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) {
+        return badRequest("date must be in YYYY-MM-DD format");
+      }
+      const upcomingDays = Number(req.query?.upcoming_days ?? "7");
+      if (!Number.isInteger(upcomingDays) || upcomingDays < 0) {
+        return badRequest("upcoming_days must be a non-negative integer");
+      }
+      const result = db.summary(date, upcomingDays);
+      const serialize = (item: ReturnType<RemiryDb["getById"]>) => serializeItem(item);
+      return ok({
+        date: result.date,
+        upcoming_days: result.upcoming_days,
+        on_date: {
+          events: result.on_date.events.map(serialize),
+          expiry: result.on_date.expiry.map(serialize),
+        },
+        upcoming: {
+          events: result.upcoming.events.map(serialize),
+          expiry: result.upcoming.expiry.map(serialize),
+        },
+      });
     } catch (err) {
       return serverError(err);
     }

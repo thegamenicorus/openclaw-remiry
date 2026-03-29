@@ -20,11 +20,49 @@ function serializeItem(item: ReturnType<RemiryDb["getById"]>) {
   return {
     ...item,
     bbf: item.bbf === 1,
-    image: item.image ? `<binary blob ${item.image.length} bytes>` : null,
+    // image is a file path string (or null)
   };
 }
 
 export function registerTools(api: ToolApi, db: RemiryDb): void {
+  // Summary — one-stop fetch
+  api.registerTool({
+    name: "remiry_summary",
+    description:
+      "One-stop fetch: returns all events and expiry items on a specific date, plus upcoming events and expiry " +
+      "within the next N days after that date. Call this first whenever the user asks about their schedule, " +
+      "what's coming up, what's expiring, or anything time-based.",
+    optional: true,
+    parameters: Type.Object({
+      date: Type.Optional(Type.String({
+        description: "The focus date in YYYY-MM-DD format (default: today)",
+      })),
+      upcoming_days: Type.Optional(Type.Number({
+        description: "How many days ahead to look for upcoming items (default: 7)",
+      })),
+    }),
+    async execute(_id, params) {
+      const date = typeof params.date === "string"
+        ? params.date
+        : new Date().toISOString().slice(0, 10);
+      const upcomingDays = typeof params.upcoming_days === "number" ? params.upcoming_days : 7;
+      const result = db.summary(date, upcomingDays);
+      const serialize = (item: ReturnType<RemiryDb["getById"]>) => serializeItem(item);
+      return textResult({
+        date: result.date,
+        upcoming_days: result.upcoming_days,
+        on_date: {
+          events: result.on_date.events.map(serialize),
+          expiry: result.on_date.expiry.map(serialize),
+        },
+        upcoming: {
+          events: result.upcoming.events.map(serialize),
+          expiry: result.upcoming.expiry.map(serialize),
+        },
+      });
+    },
+  });
+
   // List items
   api.registerTool({
     name: "remiry_list_items",
@@ -76,7 +114,7 @@ export function registerTools(api: ToolApi, db: RemiryDb): void {
         description: "'remind' for event reminders, 'expire' for expiry/best-before items",
       }),
       name: Type.String({ description: "Name of the event or item" }),
-      target_date: Type.String({ description: "Target date in YYYY-MM-DD format" }),
+      target_date: Type.String({ description: "For remind: date and time in 'YYYY-MM-DD HH:MM' format. For expire: date in YYYY-MM-DD format." }),
       desc: Type.Optional(Type.String({ description: "Optional description" })),
       bbf: Type.Optional(Type.Boolean({
         description: "Set to true for best-before (only meaningful for type='expire')",
@@ -108,7 +146,7 @@ export function registerTools(api: ToolApi, db: RemiryDb): void {
       id: Type.Number({ description: "The item ID to update" }),
       type: Type.Optional(Type.Union([Type.Literal("remind"), Type.Literal("expire")])),
       name: Type.Optional(Type.String()),
-      target_date: Type.Optional(Type.String({ description: "New target date in YYYY-MM-DD format" })),
+      target_date: Type.Optional(Type.String({ description: "New target date. For remind: 'YYYY-MM-DD HH:MM'. For expire: 'YYYY-MM-DD'." })),
       desc: Type.Optional(Type.Union([Type.String(), Type.Null()], { description: "New description or null to clear" })),
       bbf: Type.Optional(Type.Boolean()),
       active_date: Type.Optional(Type.String({ description: "New active date in YYYY-MM-DD format" })),
@@ -140,6 +178,25 @@ export function registerTools(api: ToolApi, db: RemiryDb): void {
       const deleted = db.remove(Number(params.id));
       if (!deleted) return textResult({ error: `Item ${params.id} not found` });
       return textResult({ deleted: true, id: params.id });
+    },
+  });
+
+  // Clear all
+  api.registerTool({
+    name: "remiry_clear_all",
+    description: "Delete ALL reminders and expiry items. This is irreversible. Only call this when the user explicitly asks to start fresh, clear everything, or reset all data. Always confirm with the user before calling.",
+    optional: true,
+    parameters: Type.Object({
+      confirm: Type.Literal(true, {
+        description: "Must be exactly true — acts as a safeguard against accidental wipes",
+      }),
+    }),
+    async execute(_id, params) {
+      if (params.confirm !== true) {
+        return textResult({ error: "confirm must be true" });
+      }
+      const result = db.clearAll();
+      return textResult({ ...result, message: "All items cleared" });
     },
   });
 

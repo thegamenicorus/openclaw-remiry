@@ -195,3 +195,39 @@ describe("remiry_upcoming_expiry tool", () => {
     assert.equal(((result.items as unknown[])[0] as { name: string }).name, "Hard");
   });
 });
+
+describe("remiry_summary tool", () => {
+  test("returns on_date and upcoming sections for a given date", async () => {
+    const db = initDb(":memory:");
+    db.create({ type: "remind", name: "Morning",  target_date: "2026-04-15 09:00" });
+    db.create({ type: "expire", name: "Milk",     target_date: "2026-04-15" });
+    db.create({ type: "remind", name: "Next day", target_date: "2026-04-16 10:00" });
+    db.create({ type: "expire", name: "Cheese",   target_date: "2026-04-18" });
+    const tools = buildTools(db);
+    const result = await tools.call("remiry_summary", { date: "2026-04-15", upcoming_days: 7 });
+    const on_date = result.on_date as { events: unknown[]; expiry: unknown[] };
+    const upcoming = result.upcoming as { events: unknown[]; expiry: unknown[] };
+    assert.equal(on_date.events.length, 1);
+    assert.equal(on_date.expiry.length, 1);
+    assert.equal(upcoming.events.length, 1);
+    assert.equal(upcoming.expiry.length, 1);
+  });
+
+  test("on_date items do not appear in upcoming", async () => {
+    const db = initDb(":memory:");
+    db.create({ type: "remind", name: "On day", target_date: "2026-04-15 09:00" });
+    const tools = buildTools(db);
+    const result = await tools.call("remiry_summary", { date: "2026-04-15", upcoming_days: 7 });
+    const on_date = result.on_date as { events: unknown[] };
+    const upcoming = result.upcoming as { events: unknown[] };
+    assert.equal(on_date.events.length, 1);
+    assert.equal(upcoming.events.length, 0);
+  });
+
+  test("defaults date to today", async () => {
+    const db = initDb(":memory:");
+    const tools = buildTools(db);
+    const result = await tools.call("remiry_summary", {});
+    assert.equal(result.date, new Date().toISOString().slice(0, 10));
+  });
+});

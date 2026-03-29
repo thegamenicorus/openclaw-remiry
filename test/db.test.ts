@@ -3,7 +3,6 @@ import assert from "node:assert/strict";
 import { initDb } from "../src/db.js";
 import type { RemiryDb } from "../src/db.js";
 
-// Use :memory: so each test suite gets a clean DB
 function freshDb(): RemiryDb {
   return initDb(":memory:");
 }
@@ -40,12 +39,12 @@ describe("db.create", () => {
     assert.equal(item.desc, "Weekly sync");
   });
 
-  test("stores image as buffer", () => {
+  test("stores image and returns file path", () => {
     const db = freshDb();
     const img = Buffer.from("fake-image-data");
     const item = db.create({ type: "expire", name: "Cheese", target_date: "2026-04-20", image: img });
-    assert.ok(item.image instanceof Buffer);
-    assert.equal(item.image.toString(), "fake-image-data");
+    assert.ok(typeof item.image === "string");
+    assert.ok(item.image.endsWith(".bin")); // detected as unknown → .bin
   });
 });
 
@@ -184,5 +183,55 @@ describe("db.upcomingExpiry", () => {
     const names = upcoming.map((i) => i.name);
     assert.ok(names.includes("Hard expiry"));
     assert.ok(names.includes("BBF item"));
+  });
+});
+
+describe("db.summary", () => {
+  test("on_date contains events and expiry exactly on that date", () => {
+    const db = freshDb();
+    const target = "2026-04-15";
+    db.create({ type: "remind", name: "Morning meeting", target_date: "2026-04-15 09:00" });
+    db.create({ type: "remind", name: "Evening call",   target_date: "2026-04-15 18:00" });
+    db.create({ type: "expire", name: "Milk",           target_date: "2026-04-15" });
+    db.create({ type: "remind", name: "Next week",      target_date: "2026-04-20 10:00" });
+    db.create({ type: "expire", name: "Cheese",         target_date: "2026-04-18" });
+
+    const result = db.summary(target, 7);
+    assert.equal(result.on_date.events.length, 2);
+    assert.equal(result.on_date.expiry.length, 1);
+    assert.equal(result.on_date.expiry[0].name, "Milk");
+  });
+
+  test("upcoming contains items strictly after date within window", () => {
+    const db = freshDb();
+    const target = "2026-04-15";
+    db.create({ type: "remind", name: "On target day",  target_date: "2026-04-15 09:00" });
+    db.create({ type: "remind", name: "Day after",      target_date: "2026-04-16 10:00" });
+    db.create({ type: "expire", name: "Cheese",         target_date: "2026-04-18" });
+    db.create({ type: "expire", name: "Far away",       target_date: "2026-05-01" });
+
+    const result = db.summary(target, 7);
+    // on_date does NOT appear in upcoming
+    assert.equal(result.upcoming.events.length, 1);
+    assert.equal(result.upcoming.events[0].name, "Day after");
+    // upcoming expiry within 7 days of 2026-04-15 → up to 2026-04-22
+    assert.equal(result.upcoming.expiry.length, 1);
+    assert.equal(result.upcoming.expiry[0].name, "Cheese");
+  });
+
+  test("returns date and upcoming_days in result", () => {
+    const db = freshDb();
+    const result = db.summary("2026-04-15", 14);
+    assert.equal(result.date, "2026-04-15");
+    assert.equal(result.upcoming_days, 14);
+  });
+
+  test("empty result when no items", () => {
+    const db = freshDb();
+    const result = db.summary("2026-04-15", 7);
+    assert.equal(result.on_date.events.length, 0);
+    assert.equal(result.on_date.expiry.length, 0);
+    assert.equal(result.upcoming.events.length, 0);
+    assert.equal(result.upcoming.expiry.length, 0);
   });
 });
