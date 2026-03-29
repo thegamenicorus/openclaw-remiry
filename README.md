@@ -34,7 +34,7 @@ openclaw plugins install ./
 openclaw plugins install openclaw-remiry
 ```
 
-No `npm install` needed in production — zero runtime dependencies.
+One runtime dependency: `@sinclair/typebox` (used for agent tool parameter schemas). No native compilation required.
 
 ---
 

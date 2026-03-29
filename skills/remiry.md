@@ -1,7 +1,7 @@
 ---
 name: remiry
 description: Manage reminders for upcoming events and track expiry/best-before dates. Use remiry_summary as the primary tool to get a full picture for any date.
-metadata.openclaw: {"always": true, "emoji": "⏰"}
+metadata.openclaw: {"always": false, "emoji": "⏰"}
 ---
 
 # Remiry — Reminder & Expiry Tracker
