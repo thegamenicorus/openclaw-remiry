@@ -8,13 +8,17 @@ export default {
   description: "Track reminders for upcoming events and expiry/best-before dates for items",
 
   register(api: unknown, config?: unknown) {
-    const cfg = config as Record<string, unknown> | undefined;
-    const db = initDb(
-      cfg?.dbPath    as string | undefined,
-      cfg?.imagesDir as string | undefined,
-    );
-
-    registerRoutes(api as Parameters<typeof registerRoutes>[0], db);
-    registerTools(api as Parameters<typeof registerTools>[0], db);
+    try {
+      const cfg = config as Record<string, unknown> | undefined;
+      const db = initDb(
+        cfg?.dbPath    as string | undefined,
+        cfg?.imagesDir as string | undefined,
+      );
+      registerRoutes(api as Parameters<typeof registerRoutes>[0], db);
+      registerTools(api as Parameters<typeof registerTools>[0], db);
+    } catch (err) {
+      console.error("[remiry] FAILED to register:", err);
+      throw err;
+    }
   },
 };

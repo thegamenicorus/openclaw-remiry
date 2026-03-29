@@ -17,13 +17,10 @@ const PORT = (() => {
   return i !== -1 ? Number(process.argv[i + 1]) : 3000;
 })();
 
-// ── Route registry (same shape as OpenClaw's api.registerHttpRoute) ──────────
+// ── Route registry ────────────────────────────────────────────────────────────
 
-type Handler = (req: {
-  params?: Record<string, string>;
-  query?: Record<string, string>;
-  body?: unknown;
-}) => unknown;
+import type { IncomingMessage, ServerResponse } from "node:http";
+type Handler = (req: IncomingMessage & { params?: Record<string, string> }, res: ServerResponse) => void | Promise<void>;
 
 const routes: Array<{ pattern: string; handler: Handler }> = [];
 
@@ -64,55 +61,25 @@ function matchRoute(pathname: string) {
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url ?? "/", `http://localhost:${PORT}`);
-  const method = req.method?.toUpperCase() ?? "GET";
   const pathname = url.pathname;
-
-  const query: Record<string, string> = {};
-  url.searchParams.forEach((v, k) => {
-    query[k] = v;
-  });
-
-  // Parse JSON body
-  let body: unknown;
-  if (["POST", "PUT", "PATCH"].includes(method)) {
-    const raw = await new Promise<string>((resolve) => {
-      let data = "";
-      req.on("data", (chunk) => {
-        data += chunk;
-      });
-      req.on("end", () => resolve(data));
-    });
-    if (raw) {
-      try {
-        body = JSON.parse(raw);
-      } catch {
-        body = raw;
-      }
-    }
-  }
 
   const matched = matchRoute(pathname);
 
   if (!matched) {
     res.writeHead(404, { "Content-Type": "application/json" });
-    res.end(
-      JSON.stringify({
-        success: false,
-        error: `No route: ${method} ${pathname}`,
-      }),
-    );
+    res.end(JSON.stringify({ success: false, error: `No route: ${req.method} ${pathname}` }));
     return;
   }
 
+  // Inject path params onto req and add res.json helper
+  (req as Parameters<Handler>[0]).params = matched.params;
+  (res as Parameters<Handler>[1] & { json: (b: unknown) => void }).json = (body: unknown) => {
+    res.writeHead(res.statusCode || 200, { "Content-Type": "application/json" });
+    res.end(JSON.stringify(body, null, 2));
+  };
+
   try {
-    const result = (await matched.handler({
-      method,
-      params: matched.params,
-      query,
-      body,
-    })) as { status: number; body: unknown };
-    res.writeHead(result.status, { "Content-Type": "application/json" });
-    res.end(JSON.stringify(result.body, null, 2));
+    await matched.handler(req as Parameters<Handler>[0], res as Parameters<Handler>[1]);
   } catch (err) {
     res.writeHead(500, { "Content-Type": "application/json" });
     res.end(JSON.stringify({ success: false, error: String(err) }));
