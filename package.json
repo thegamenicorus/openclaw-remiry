@@ -1,5 +1,5 @@
 {
-  "name": "openclaw-remiry",
+  "name": "remiry",
   "version": "1.0.0",
   "description": "OpenClaw plugin to track reminders and item expiry/best-before dates",
   "type": "module",

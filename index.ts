@@ -1,14 +1,13 @@
-import { definePluginEntry } from "openclaw/plugin-sdk/plugin-entry";
 import { initDb } from "./src/db.js";
 import { registerRoutes } from "./src/routes.js";
 import { registerTools } from "./src/tools.js";
 
-export default definePluginEntry({
+export default {
   id: "remiry",
   name: "OpenClaw Remiry",
   description: "Track reminders for upcoming events and expiry/best-before dates for items",
 
-  register(api, config) {
+  register(api: unknown, config?: unknown) {
     const cfg = config as Record<string, unknown> | undefined;
     const db = initDb(
       cfg?.dbPath    as string | undefined,
@@ -18,4 +17,4 @@ export default definePluginEntry({
     registerRoutes(api as Parameters<typeof registerRoutes>[0], db);
     registerTools(api as Parameters<typeof registerTools>[0], db);
   },
-});
+};

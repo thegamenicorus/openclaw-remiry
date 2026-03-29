@@ -10,8 +10,8 @@ type Handler = (req: { params?: Record<string, string>; query?: Record<string, s
 function buildRouter(db: RemiryDb) {
   const routes: Map<string, Handler> = new Map();
   const api = {
-    registerHttpRoute(method: string, path: string, handler: Handler) {
-      routes.set(`${method} ${path}`, handler);
+    registerHttpRoute(opts: { method: string; path: string; handler: Handler }) {
+      routes.set(`${opts.method} ${opts.path}`, opts.handler);
     },
   };
   registerRoutes(api, db);
