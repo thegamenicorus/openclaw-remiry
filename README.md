@@ -79,6 +79,18 @@ Optional. Add to `~/.openclaw/openclaw.json` only if you want custom paths:
 
 All routes are served by OpenClaw at `http://127.0.0.1:18789` (default gateway address).
 
+Routes use `auth: "plugin"` — no Authorization header required.
+
+### Health check
+
+```
+GET /remiry/health
+```
+
+Returns `{ "success": true, "data": { "status": "ok", "items": N } }`. Use this to confirm the plugin is loaded and the database is accessible.
+
+---
+
 ### One-stop Summary ⭐
 
 ```
@@ -212,7 +224,7 @@ Error:
 { "success": false, "error": "message" }
 ```
 
-Images in responses are returned as absolute file paths (e.g. `"/Users/you/.openclaw/workspace/remiry/images/1.jpg"`), or `null` if not set.
+Images in responses are returned as absolute file paths (e.g. `"/home/you/.openclaw/extensions/remiry/images/1.jpg"`), or `null` if not set.
 
 ---
 
@@ -298,10 +310,10 @@ Starts a local HTTP server backed by `dev.db` in the project root. Prints ready-
 ```
 openclaw-remiry/
 ├── index.ts              ← Plugin entry point
-├── dev-server.ts         ← Local dev/test server
+├── dev-server.ts         ← Local dev/test server (npm run dev)
 ├── src/
 │   ├── db.ts             ← SQLite (node:sqlite) init and query helpers
-│   ├── routes.ts         ← HTTP route handlers
+│   ├── routes.ts         ← HTTP route handlers (Node.js req/res, auth: "plugin")
 │   └── tools.ts          ← Agent tool registrations
 ├── skills/
 │   └── remiry.md         ← OpenClaw skill definition
