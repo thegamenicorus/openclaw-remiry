@@ -1,0 +1,15 @@
+{
+  "id": "remiry",
+  "name": "OpenClaw Remiry",
+  "description": "Track reminders for upcoming events and expiry/best-before dates for items",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "dbPath": {
+        "type": "string",
+        "description": "Custom path for the SQLite database file (default: ~/.openclaw/remiry.db)"
+      }
+    }
+  }
+}

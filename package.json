@@ -1,0 +1,23 @@
+{
+  "name": "openclaw-remiry",
+  "version": "1.0.0",
+  "description": "OpenClaw plugin to track reminders and item expiry/best-before dates",
+  "type": "module",
+  "main": "./index.ts",
+  "openclaw": {
+    "extensions": ["./index.ts"],
+    "skills": ["./skills"]
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.0.0",
+    "@sinclair/typebox": "^0.33.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0",
+    "@types/better-sqlite3": "^7.6.11",
+    "@types/node": "^22.0.0"
+  }
+}
